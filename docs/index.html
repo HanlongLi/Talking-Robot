@@ -1,0 +1,282 @@
+<title>Artoo Playground</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --bg: #F4F6F8; --panel: #FFFFFF; --panel2: #EEF2F5; --line: #D6DDE3; --ink: #16202A; --muted: #5C6B7A;
+    --accent: #0B7A75; --accent-ink: #FFFFFF; --accent-soft: #D9F0EE; --chan: #C2410C; --chan-soft: #FBE3D6;
+    --ok: #1E8E3E; --bad: #C62828; --warn: #B7791F; --trace: #0B7A75; --trace-rx: #C2410C;
+    --sans: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif; --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg: #101418; --panel: #171C21; --panel2: #1F262C; --line: #2C353D; --ink: #E8EDF2; --muted: #94A3B3;
+    --accent: #2CC5BC; --accent-ink: #06201E; --accent-soft: #123C39; --chan: #F97316; --chan-soft: #3D2314;
+    --ok: #4ADE80; --bad: #F87171; --warn: #FBBF24; --trace: #2CC5BC; --trace-rx: #F97316; color-scheme: dark; } }
+  :root[data-theme="dark"] {
+    --bg: #101418; --panel: #171C21; --panel2: #1F262C; --line: #2C353D; --ink: #E8EDF2; --muted: #94A3B3;
+    --accent: #2CC5BC; --accent-ink: #06201E; --accent-soft: #123C39; --chan: #F97316; --chan-soft: #3D2314;
+    --ok: #4ADE80; --bad: #F87171; --warn: #FBBF24; --trace: #2CC5BC; --trace-rx: #F97316; color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 15px; line-height: 1.45; padding-inline: 20px; padding-block: 24px 48px; }
+  h1, h2, h3 { text-wrap: balance; margin: 0; }
+  h1 { font-size: 26px; font-weight: 600; letter-spacing: -0.01em; }
+  h2 { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+  .wrap { max-width: 1180px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+  header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 24px; }
+  header p { margin: 4px 0 0; color: var(--muted); max-width: 70ch; }
+  .status { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 20px; }
+  @media (max-width: 880px) { .grid { grid-template-columns: 1fr; } }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+  .panel.tx { border-top: 3px solid var(--accent); } .panel.rx { border-top: 3px solid var(--chan); }
+  label { font-size: 12px; font-weight: 500; color: var(--muted); display: block; margin-bottom: 4px; }
+  textarea, select, input[type=number] { width: 100%; font: inherit; color: var(--ink); background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 9px 10px; }
+  textarea { font-family: var(--mono); font-size: 15px; min-height: 64px; resize: vertical; }
+  textarea:focus, select:focus, button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { font-family: var(--mono); font-size: 12px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel2); color: var(--ink); cursor: pointer; }
+  .chip:hover { border-color: var(--accent); }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .row > * { flex: 1 1 140px; } .row > .grow0 { flex: 0 0 auto; }
+  button { font: inherit; font-weight: 500; border-radius: 6px; padding: 9px 14px; border: 1px solid var(--line); background: var(--panel2); color: var(--ink); cursor: pointer; }
+  button.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+  button.primary:disabled { opacity: 0.6; cursor: wait; }
+  button.chan { background: var(--chan); color: #fff; border-color: transparent; }
+  canvas { width: 100%; max-width: 100%; display: block; border-radius: 6px; background: var(--panel2); }
+  .canvasbox { position: relative; } .canvasbox .cap { position: absolute; left: 8px; top: 6px; font-family: var(--mono); font-size: 11px; color: var(--muted); background: color-mix(in srgb, var(--panel) 75%, transparent); padding: 1px 6px; border-radius: 4px; }
+  .readout { font-family: var(--mono); font-size: 18px; line-height: 1.5; min-height: 2em; padding: 10px 12px; background: var(--panel2); border-radius: 6px; word-break: break-word; }
+  .tok { padding: 0 1px; border-radius: 3px; } .tok.sub { background: color-mix(in srgb, var(--bad) 25%, transparent); text-decoration: underline; } .tok.ins { background: color-mix(in srgb, var(--warn) 30%, transparent); } .tok.del { background: color-mix(in srgb, var(--bad) 25%, transparent); opacity: 0.55; text-decoration: line-through; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; }
+  .stat { background: var(--panel2); border-radius: 6px; padding: 8px 10px; } .stat b { display: block; font-family: var(--mono); font-size: 20px; font-weight: 500; font-variant-numeric: tabular-nums; } .stat span { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+  .stat.good b { color: var(--ok); } .stat.bad b { color: var(--bad); }
+  .slider { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; } input[type=range] { width: 100%; accent-color: var(--chan); }
+  .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .toggles { display: flex; flex-wrap: wrap; gap: 8px 16px; } .toggles label { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--ink); font-size: 14px; font-weight: 400; cursor: pointer; }
+  .note { font-size: 13px; color: var(--muted); margin: 0; }
+  .pill { font-family: var(--mono); font-size: 11px; padding: 2px 7px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+  .pill.on { border-color: var(--ok); color: var(--ok); } .pill.off { border-color: var(--bad); color: var(--bad); }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; } th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); } td.num, th.num { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .tablebox { overflow-x: auto; }
+  progress { width: 100%; accent-color: var(--accent); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Artoo Playground</h1>
+      <p>Type a message, let the transmitter turn it into sound, push it through a simulated acoustic channel, and watch the receiver decode it. Both neural networks run right here in your browser (2.1 M parameters, no server).</p>
+    </div>
+    <div class="status" id="status">loading weights…</div>
+  </header>
+
+  <div class="grid">
+    <section class="panel tx">
+      <h2>Transmitter</h2>
+      <div>
+        <label for="msg">Message (letters, digits, punctuation, and the 44 robot command tokens)</label>
+        <textarea id="msg" spellcheck="false">move forward 5 meters</textarea>
+      </div>
+      <div class="chips" id="chips"></div>
+      <div class="row">
+        <div><label for="model">Model</label><select id="model"></select></div>
+        <div><label for="txkind">Transmitter</label><select id="txkind"><option value="tts">Learned TTS (co-trained)</option><option value="ps">Procedural synthesizer (hand-coded tones)</option></select></div>
+      </div>
+      <div class="row">
+        <button class="primary" id="send">Transmit &amp; decode</button>
+        <button id="random" class="grow0">Random message</button>
+        <button id="play" class="grow0" disabled>Play clean</button>
+        <button id="playrx" class="grow0" disabled>Play received</button>
+      </div>
+      <div class="canvasbox"><canvas id="wave" height="90"></canvas><span class="cap">waveform · 16 kHz</span></div>
+      <div class="canvasbox"><canvas id="spec" height="150"></canvas><span class="cap">transmitted mel spectrogram · 40 bins × 10 ms</span></div>
+      <p class="note" id="txinfo">Ready.</p>
+    </section>
+
+    <section class="panel rx">
+      <h2>Channel &amp; receiver</h2>
+      <div class="row">
+        <div><label for="noise">Noise colour</label><select id="noise"><option value="mixed">mixed (white + pink + brown)</option><option value="white">white (Gaussian)</option><option value="pink">pink (1/f)</option><option value="brown">brown (1/f²)</option></select></div>
+        <div><label for="snr">SNR <span class="mono" id="snrv">5 dB</span></label><div class="slider"><input type="range" id="snr" min="-15" max="30" step="1" value="5"><label style="margin:0"><input type="checkbox" id="clean"> clean</label></div></div>
+      </div>
+      <div class="toggles">
+        <label><input type="checkbox" id="reverb"> reverb (20 ms pre-delay, 30 % wet)</label>
+        <label><input type="checkbox" id="clip"> hard clipping at ±0.5</label>
+        <label><input type="checkbox" id="drift"> +1 % sample-rate drift</label>
+      </div>
+      <div class="canvasbox"><canvas id="specrx" height="150"></canvas><span class="cap">received mel spectrogram (after channel)</span></div>
+      <div>
+        <label>Decoded by the receiver</label>
+        <div class="readout" id="decoded">—</div>
+      </div>
+      <div class="stats">
+        <div class="stat" id="st-cer"><b>—</b><span>token CER</span></div>
+        <div class="stat" id="st-em"><b>—</b><span>exact match</span></div>
+        <div class="stat"><b id="st-lat">—</b><span>encode + decode</span></div>
+        <div class="stat"><b id="st-dur">—</b><span>audio length</span></div>
+      </div>
+      <p class="note">Legend: <span class="tok sub">substituted</span> · <span class="tok ins">inserted</span> · <span class="tok del">dropped</span>. CER is the token-level edit distance divided by the message length.</p>
+    </section>
+  </div>
+
+  <div class="grid">
+    <section class="panel">
+      <h2>Stress test</h2>
+      <p class="note">Send a batch of random corpus messages through the current channel settings and measure the character error rate, like Table V of the paper but live.</p>
+      <div class="row">
+        <div><label for="nbatch">Messages</label><input type="number" id="nbatch" value="20" min="5" max="200"></div>
+        <button id="batch" class="chan grow0">Run batch</button>
+      </div>
+      <progress id="bprog" value="0" max="1" hidden></progress>
+      <div class="tablebox"><table id="btable"><thead><tr><th>Condition</th><th>Transmitter</th><th class="num">n</th><th class="num">CER %</th><th class="num">EM %</th></tr></thead><tbody></tbody></table></div>
+    </section>
+
+    <section class="panel">
+      <h2>Over the air</h2>
+      <p class="note">Play a transmission on one device and let this device listen: record a few seconds through the microphone and the receiver decodes what it heard. The microphone is not available inside some embedded viewers; host this page on your own site (it is a static folder) to use it.</p>
+      <div class="row">
+        <div><label for="recsec">Seconds</label><input type="number" id="recsec" value="4" min="1" max="15"></div>
+        <button id="listen" class="grow0">Listen &amp; decode</button>
+        <span class="pill" id="micpill">microphone: unknown</span>
+      </div>
+      <div class="canvasbox"><canvas id="specmic" height="120"></canvas><span class="cap">microphone mel spectrogram (trimmed)</span></div>
+      <div class="readout" id="micdecoded">—</div>
+    </section>
+  </div>
+
+  <p class="note">Models: <b>released</b> = the authors' published weights; <b>reproduced</b> = the repository code retrained from scratch plus a receiver retrained on the vocoded, noisy deployment path. Inference is the same PyTorch architecture re-implemented in JavaScript (fp16 weights); Griffin-Lim uses 32 iterations with random phase, so the audio differs slightly on each transmission, as in the paper's evaluation.</p>
+</div>
+
+<script src="artoo.js"></script>
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const MODELS = [{ id: "released", label: "Released weights (authors)", maxMel: 400 }, { id: "reproduced", label: "Reproduced (repo code + stage 2)", maxMel: 300 }];
+  const TEMPLATES = ["move forward {n} meters", "turn left {n} degrees", "turn right {n} degrees", "go to position {n},{m}", "navigate to waypoint {n}", "return to base", "stop immediately", "proceed to target", "follow the path", "avoid obstacle ahead", "move backward {n} steps", "rotate {n} degrees", "heading {n} degrees north", "speed {n} meters per second", "battery level {n} percent", "sensor {n} online", "distance to target {n} meters", "motor {n} temperature {m}", "obstacle detected at {n} meters", "signal strength {n} percent", "task {n} completed", "error code {n}", "position x {n} y {m}", "heading {n} degrees", "robot {n} ready", "robot {n} waiting", "formation alpha", "formation beta", "synchronize clocks", "begin patrol route {n}", "switch to channel {n}", "acknowledge message {n}", "request assistance", "area {n} clear", "target acquired", "mission complete", "<GO> <FWD> {n}", "<STOP> <WAIT>", "<ACK> message received", "<ALERT> obstacle at {n}", "<STATUS> battery {n}", "<READY> for task {n}", "<GRAB> object at {n},{m}", "<SCAN> sector {n}", "<FOLLOW> robot {n}", "<FORM> line formation", "<SYNC> start in {n}", "<REPORT> area {n} status", "waypoint {n} reached", "hold position for {n} seconds", "engage target at bearing {n}", "requesting backup at sector {n}", "all units report status", "switch to frequency {n}", "abort mission {n}", "commence landing sequence", "deploy sensor array {n}", "initiate scan pattern {n}", "<ROTATE> {n} degrees", "<LIFT> object {n}", "<LOWER> to position {n}", "<PUSH> forward {n}", "<PULL> backward {n}", "<OPEN> hatch {n}", "<CLOSE> valve {n}", "<LEAD> formation {n}", "<FOLLOW> leader", "<CHARGE> at station {n}", "<IDLE> until signal"];
+  const PHRASES = ["hello", "yes", "no", "ok", "help", "the quick brown fox", "all systems nominal", "ready to proceed", "waiting for input", "check sensors", "update firmware", "low power mode", "high priority alert", "data received", "connection established", "link quality good", "calibration complete", "test passed", "reboot system", "standby mode active", "emergency shutdown", "clear the area", "hold position", "confirm receipt", "negative contact", "all units report", "green light go", "target locked", "signal lost", "retry connection", "mission parameters loaded", "coordinates locked in", "perimeter secure", "requesting permission to proceed", "all clear on channel {n}", "interference detected", "switching to backup frequency", "telemetry nominal", "payload delivered", "rendezvous at checkpoint {n}"];
+  const weights = {}, state = { W: null, model: null, wavTx: null, wavRx: null, busy: false };
+  const rint = (n) => Math.floor(Math.random() * n);
+  function randomMessage() { const u = Math.random();
+    if (u < 0.6) return TEMPLATES[rint(TEMPLATES.length)].replace("{n}", rint(1000)).replace("{m}", rint(1000));
+    if (u < 0.8) return PHRASES[rint(PHRASES.length)].replace("{n}", rint(100));
+    if (u < 0.92) return Array.from({ length: 1 + rint(4) }, () => Artoo.CMDS[rint(Artoo.CMDS.length)]).join(" ");
+    const ac = "abcdefghijklmnopqrstuvwxyz0123456789.,!?-:;'\"()/@#_+"; let s = ""; const L = 3 + rint(20); for (let i = 0; i < L; i++) s += ac[rint(ac.length)];
+    const words = []; let i = 0; while (i < s.length) { const wl = 1 + rint(5); words.push(s.slice(i, i + wl)); i += wl; } return words.join(" "); }
+
+  // ---- setup
+  Artoo.CMDS.forEach((c) => { const b = document.createElement("button"); b.className = "chip"; b.type = "button"; b.textContent = c; b.addEventListener("click", () => { const ta = $("msg"); const s = ta.selectionStart ?? ta.value.length; const before = ta.value.slice(0, s), after = ta.value.slice(s); ta.value = (before + (before && !before.endsWith(" ") ? " " : "") + c + " " + after).replace(/\s+$/, " "); ta.focus(); }); $("chips").appendChild(b); });
+  MODELS.forEach((m) => { const o = document.createElement("option"); o.value = m.id; o.textContent = m.label; $("model").appendChild(o); });
+  async function loadModel(id) {
+    if (weights[id]) return weights[id];
+    $("status").textContent = "loading " + id + " weights…";
+    const r = await fetch("weights/" + id + ".wasm"); if (!r.ok) throw new Error("weights not published for " + id);
+    weights[id] = Artoo.loadContainer(await r.arrayBuffer()); return weights[id]; }
+  async function init() {
+    try { Artoo.setConstants(await (await fetch("constants.json")).json()); } catch (e) { $("status").textContent = "could not load constants.json"; return; }
+    const available = []; for (const m of MODELS) { try { await loadModel(m.id); available.push(m.id); } catch (e) { const o = $("model").querySelector('option[value="' + m.id + '"]'); o.disabled = true; o.textContent += " (not published)"; } }
+    if (!available.length) { $("status").textContent = "no weights available"; return; }
+    $("model").value = available[0]; state.model = MODELS.find((m) => m.id === available[0]); state.W = weights[available[0]];
+    $("status").textContent = "ready · " + available.length + " model" + (available.length > 1 ? "s" : "") + " loaded";
+    checkMic();
+    transmit();
+  }
+  $("model").addEventListener("change", async () => { state.model = MODELS.find((m) => m.id === $("model").value); state.W = await loadModel(state.model.id); $("status").textContent = "ready · " + state.model.label; });
+  $("snr").addEventListener("input", () => { $("snrv").textContent = $("snr").value + " dB"; });
+  $("clean").addEventListener("change", () => { $("snr").disabled = $("clean").checked; });
+  $("random").addEventListener("click", () => { $("msg").value = randomMessage(); transmit(); });
+  $("send").addEventListener("click", transmit);
+  $("msg").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); transmit(); } });
+  ["noise", "snr", "clean", "reverb", "clip", "drift"].forEach((id) => $(id).addEventListener("change", () => { if (state.wavTx) receiveOnly(); }));
+
+  function channelCond() { return { noise: $("noise").value, snr: $("clean").checked ? null : Number($("snr").value), reverb: $("reverb").checked, clip: $("clip").checked, drift: $("drift").checked, driftRatio: 1.01 }; }
+  function condLabel(c) { const parts = [c.snr === null ? "clean" : c.snr + " dB " + c.noise]; if (c.reverb) parts.push("reverb"); if (c.clip) parts.push("clip"); if (c.drift) parts.push("drift"); return parts.join(" + "); }
+  const yieldUI = () => new Promise((r) => setTimeout(r, 0));
+
+  // ---- transmit / receive
+  async function transmit() {
+    if (state.busy || !state.W) return; state.busy = true; $("send").disabled = true;
+    const text = $("msg").value.trim(); const ids = Artoo.encode(text);
+    if (!ids.length) { state.busy = false; $("send").disabled = false; return; }
+    try {
+      const t0 = performance.now(); let wav, info;
+      if ($("txkind").value === "tts") { const out = Artoo.ttsInfer(state.W, ids, state.model.maxMel); await yieldUI(); const t1 = performance.now(); wav = Artoo.griffinLim(out.mel, out.T, 32, 0.99, Math.random); info = `TTS ${(t1 - t0).toFixed(0)} ms → ${out.T} mel frames (${(out.T / ids.length).toFixed(1)} per token) → Griffin-Lim ${(performance.now() - t1).toFixed(0)} ms`; drawSpec($("spec"), out.mel, out.T); }
+      else { wav = Artoo.psSynth(ids); const m = Artoo.melFromWav(wav); drawSpec($("spec"), m.mel, m.T); info = `procedural synthesizer: ${ids.length} tone chips × 60 ms`; }
+      state.wavTx = wav; state.ids = ids; state.tEnc = performance.now() - t0; $("txinfo").textContent = info; drawWave($("wave"), wav);
+      $("play").disabled = false; $("playrx").disabled = false; $("st-dur").textContent = (wav.length / Artoo.SR).toFixed(2) + " s";
+      await yieldUI(); receiveOnly();
+    } finally { state.busy = false; $("send").disabled = false; }
+  }
+  function receiveOnly() {
+    const cond = channelCond(), t0 = performance.now();
+    const rx = Artoo.applyChannel(state.wavTx, cond, Math.random); state.wavRx = rx;
+    const m = Artoo.melFromWav(rx); drawSpec($("specrx"), m.mel, m.T);
+    const hyp = Artoo.asrDecode(state.W, m.mel, m.T); const tDec = performance.now() - t0;
+    showDecode(state.ids, hyp); $("st-lat").textContent = (state.tEnc + tDec).toFixed(0) + " ms";
+  }
+  function showDecode(ref, hyp) {
+    const ops = align(ref, hyp); const box = $("decoded"); box.innerHTML = "";
+    for (const [kind, r, h] of ops) { const s = document.createElement("span"); s.className = "tok " + kind; s.textContent = kind === "del" ? Artoo.decode([r]) : Artoo.decode([h]); if (kind === "sub") s.title = "expected " + Artoo.decode([r]); box.appendChild(s); }
+    const dist = Artoo.editDistance(ref, hyp), cer = 100 * Math.min(dist, ref.length) / ref.length;
+    const c = $("st-cer"); c.querySelector("b").textContent = cer.toFixed(1) + " %"; c.className = "stat " + (cer === 0 ? "good" : cer > 10 ? "bad" : "");
+    const e = $("st-em"); e.querySelector("b").textContent = dist === 0 ? "yes" : "no"; e.className = "stat " + (dist === 0 ? "good" : "bad");
+  }
+  function align(a, b) { // Levenshtein backtrace -> [[kind, refTok, hypTok]]
+    const n = a.length, m = b.length, d = Array.from({ length: n + 1 }, () => new Int32Array(m + 1));
+    for (let i = 0; i <= n; i++) d[i][0] = i; for (let j = 0; j <= m; j++) d[0][j] = j;
+    for (let i = 1; i <= n; i++) for (let j = 1; j <= m; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    const ops = []; let i = n, j = m;
+    while (i > 0 || j > 0) { if (i > 0 && j > 0 && d[i][j] === d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)) { ops.push([a[i - 1] === b[j - 1] ? "ok" : "sub", a[i - 1], b[j - 1]]); i--; j--; }
+      else if (j > 0 && d[i][j] === d[i][j - 1] + 1) { ops.push(["ins", null, b[j - 1]]); j--; } else { ops.push(["del", a[i - 1], null]); i--; } }
+    return ops.reverse();
+  }
+
+  // ---- drawing
+  function magma(v) { v = Math.max(0, Math.min(1, v)); const stops = [[0, 0, 4], [40, 12, 87], [120, 28, 109], [190, 55, 82], [239, 105, 51], [251, 173, 60], [252, 253, 191]]; const x = v * (stops.length - 1), i = Math.min(Math.floor(x), stops.length - 2), f = x - i; const c = stops[i].map((a, k) => Math.round(a + (stops[i + 1][k] - a) * f)); return c; }
+  function drawSpec(canvas, mel, T) { const dpr = window.devicePixelRatio || 1, Wc = canvas.clientWidth || 600, Hc = canvas.height; canvas.width = Math.round(Wc * dpr); canvas.height = Math.round(Hc * dpr);
+    const ctx = canvas.getContext("2d"); const img = ctx.createImageData(T, 40); let mx = 1e-6; for (let i = 0; i < mel.length; i++) mx = Math.max(mx, mel[i]);
+    for (let m = 0; m < 40; m++) for (let t = 0; t < T; t++) { const c = magma(mel[m * T + t] / mx); const o = ((39 - m) * T + t) * 4; img.data[o] = c[0]; img.data[o + 1] = c[1]; img.data[o + 2] = c[2]; img.data[o + 3] = 255; }
+    const off = document.createElement("canvas"); off.width = T; off.height = 40; off.getContext("2d").putImageData(img, 0, 0);
+    ctx.imageSmoothingEnabled = false; ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.drawImage(off, 0, 0, canvas.width, canvas.height); }
+  function drawWave(canvas, wav) { const dpr = window.devicePixelRatio || 1, Wc = canvas.clientWidth || 600, Hc = canvas.height; canvas.width = Math.round(Wc * dpr); canvas.height = Math.round(Hc * dpr);
+    const ctx = canvas.getContext("2d"), W = canvas.width, H = canvas.height; ctx.clearRect(0, 0, W, H); ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue("--trace").trim() || "#0B7A75"; ctx.lineWidth = dpr;
+    let pk = 1e-6; for (let i = 0; i < wav.length; i++) pk = Math.max(pk, Math.abs(wav[i])); ctx.beginPath();
+    for (let x = 0; x < W; x++) { const a = Math.floor(x * wav.length / W), b = Math.floor((x + 1) * wav.length / W); let lo = 0, hi = 0; for (let i = a; i < b; i++) { lo = Math.min(lo, wav[i]); hi = Math.max(hi, wav[i]); } ctx.moveTo(x, H / 2 - hi / pk * H * 0.45); ctx.lineTo(x, H / 2 - lo / pk * H * 0.45 + 0.5); } ctx.stroke(); }
+
+  // ---- audio
+  let actx = null;
+  function play(wav) { if (!wav) return; actx = actx || new (window.AudioContext || window.webkitAudioContext)(); const sr = actx.sampleRate, n = Math.round(wav.length * sr / Artoo.SR), buf = actx.createBuffer(1, n, sr), ch = buf.getChannelData(0);
+    let pk = 1e-6; for (let i = 0; i < wav.length; i++) pk = Math.max(pk, Math.abs(wav[i]));
+    for (let i = 0; i < n; i++) { const s = i * Artoo.SR / sr, i0 = Math.floor(s), f = s - i0; const a = wav[Math.min(i0, wav.length - 1)], b = wav[Math.min(i0 + 1, wav.length - 1)]; ch[i] = (a + (b - a) * f) / pk * 0.8; }
+    const src = actx.createBufferSource(); src.buffer = buf; src.connect(actx.destination); src.start(); }
+  $("play").addEventListener("click", () => play(state.wavTx)); $("playrx").addEventListener("click", () => play(state.wavRx));
+
+  // ---- batch stress test
+  $("batch").addEventListener("click", async () => {
+    if (state.busy || !state.W) return; state.busy = true; $("batch").disabled = true; const n = Math.max(5, Math.min(200, Number($("nbatch").value) || 20)); const cond = channelCond(), ps = $("txkind").value === "ps";
+    const prog = $("bprog"); prog.hidden = false; prog.value = 0; let err = 0, len = 0, em = 0;
+    for (let i = 0; i < n; i++) { const ids = Artoo.encode(randomMessage()); let wav; if (ps) wav = Artoo.psSynth(ids); else { const o = Artoo.ttsInfer(state.W, ids, state.model.maxMel); wav = Artoo.griffinLim(o.mel, o.T, 32, 0.99, Math.random); }
+      const m = Artoo.melFromWav(Artoo.applyChannel(wav, cond, Math.random)); const hyp = Artoo.asrDecode(state.W, m.mel, m.T); const d = Math.min(Artoo.editDistance(ids, hyp), ids.length); err += d; len += ids.length; em += d === 0 ? 1 : 0; prog.value = (i + 1) / n; await yieldUI(); }
+    const tr = document.createElement("tr"); tr.innerHTML = `<td>${condLabel(cond)} · ${state.model.id}</td><td>${ps ? "procedural synth" : "learned TTS"}</td><td class="num">${n}</td><td class="num">${(100 * err / len).toFixed(1)}</td><td class="num">${(100 * em / n).toFixed(0)}</td>`; $("btable").querySelector("tbody").prepend(tr);
+    prog.hidden = true; state.busy = false; $("batch").disabled = false; });
+
+  // ---- microphone
+  function checkMic() { const ok = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia); const p = $("micpill"); p.textContent = ok ? "microphone: available" : "microphone: not available here"; p.className = "pill " + (ok ? "on" : "off"); $("listen").disabled = !ok; }
+  $("listen").addEventListener("click", async () => {
+    const secs = Math.max(1, Math.min(15, Number($("recsec").value) || 4)); const btn = $("listen"); btn.disabled = true; $("micdecoded").textContent = "listening…";
+    try { const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+      const ctx = new (window.AudioContext || window.webkitAudioContext)(); const src = ctx.createMediaStreamSource(stream); const proc = ctx.createScriptProcessor(4096, 1, 1); const chunks = [];
+      proc.onaudioprocess = (e) => chunks.push(new Float32Array(e.inputBuffer.getChannelData(0))); src.connect(proc); proc.connect(ctx.destination);
+      await new Promise((r) => setTimeout(r, secs * 1000)); proc.disconnect(); src.disconnect(); stream.getTracks().forEach((t) => t.stop());
+      let total = 0; chunks.forEach((c) => total += c.length); const raw = new Float32Array(total); let o = 0; chunks.forEach((c) => { raw.set(c, o); o += c.length; });
+      const ratio = Artoo.SR / ctx.sampleRate, n = Math.floor(raw.length * ratio), wav = new Float32Array(n); for (let i = 0; i < n; i++) { const s = i / ratio, i0 = Math.floor(s), f = s - i0; wav[i] = raw[i0] + ((raw[i0 + 1] ?? raw[i0]) - raw[i0]) * f; }
+      // trim to the active region (frames above -30 dB of the peak frame energy)
+      const fl = 400, nf = Math.floor(n / fl), en = new Float32Array(nf); let pk = 1e-9; for (let k = 0; k < nf; k++) { let s = 0; for (let i = 0; i < fl; i++) s += wav[k * fl + i] ** 2; en[k] = s; pk = Math.max(pk, s); }
+      let a = 0, b = nf - 1; while (a < nf && en[a] < pk / 1000) a++; while (b > a && en[b] < pk / 1000) b--; const seg = wav.subarray(Math.max(0, (a - 2) * fl), Math.min(n, (b + 3) * fl));
+      if (seg.length < 2 * Artoo.HOP) { $("micdecoded").textContent = "nothing heard"; return; }
+      const m = Artoo.melFromWav(seg); drawSpec($("specmic"), m.mel, m.T); const hyp = Artoo.asrDecode(state.W, m.mel, m.T); $("micdecoded").textContent = Artoo.decode(hyp) || "(empty)"; ctx.close();
+    } catch (e) { $("micdecoded").textContent = "microphone unavailable: " + (e.message || e); } finally { btn.disabled = false; } });
+
+  init();
+})();
+</script>
