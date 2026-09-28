@@ -47,8 +47,9 @@
   button:not(:disabled):hover { border-color: var(--accent); background: var(--accent-soft); }
   button.primary:not(:disabled):hover { background: color-mix(in srgb, var(--accent) 85%, black); } button.chan:not(:disabled):hover { background: color-mix(in srgb, var(--chan) 85%, black); } button.b:not(:disabled):hover { background: color-mix(in srgb, var(--b) 85%, black); }
   button:not(:disabled):active { transform: translateY(1px); filter: brightness(0.92); }
-  button.busy { background: var(--accent); color: var(--accent-ink); border-color: transparent; cursor: progress; opacity: 1; }
-  button.flash { background: var(--accent-soft); border-color: var(--accent); }
+  button.busy, button.primary.busy, button.b.busy { background: var(--chan); color: #fff; border-color: transparent; cursor: progress; opacity: 1; }
+  button.done, button.primary.done, button.b.done { background: var(--ok); color: #fff; border-color: transparent; opacity: 1; }
+  button.flash { background: var(--chan-soft); border-color: var(--chan); }
   button { transition: background-color 120ms ease, border-color 120ms ease, transform 60ms ease; }
   canvas { width: 100%; max-width: 100%; display: block; border-radius: 6px; background: var(--panel2); }
   .canvasbox { position: relative; } .canvasbox .cap { position: absolute; left: 8px; top: 6px; font-family: var(--mono); font-size: 11px; color: var(--muted); background: color-mix(in srgb, var(--panel) 75%, transparent); padding: 1px 6px; border-radius: 4px; }
@@ -244,7 +245,7 @@
       drawSpec($("spec"), s.mel, s.T); drawWave($("wave"), s.wav); $("play").disabled = false; $("playrx").disabled = false; $("st-dur").textContent = (s.wav.length / Artoo.SR).toFixed(2) + " s";
       await yieldUI(); receiveOnly();
       const mode = $("autoplay").value; if (withSound && mode !== "none") await playAsync(mode === "rx" ? state.wavRx : state.wavTx);
-    } finally { state.busy = false; sendBtn.disabled = false; sendBtn.classList.remove("busy"); sendBtn.textContent = "Transmit & decode"; }
+    } finally { state.busy = false; sendBtn.disabled = false; sendBtn.classList.remove("busy"); sendBtn.classList.add("done"); sendBtn.textContent = "Decoded \u2713"; setTimeout(() => { sendBtn.classList.remove("done"); sendBtn.textContent = "Transmit & decode"; }, 700); }
   }
   function receiveOnly() {
     const t0 = performance.now(); const r = receive(state.wavTx, channelCond()); state.wavRx = r.rx; drawSpec($("specrx"), r.mel, r.T);
@@ -280,12 +281,21 @@
 
   // ---- audio out
   let actx = null;
-  function audioCtx() { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === "suspended") actx.resume(); return actx; }
-  function playAsync(wav) { return new Promise((resolve) => { if (!wav) return resolve(); const ctx = audioCtx(), sr = ctx.sampleRate, n = Math.round(wav.length * sr / Artoo.SR), buf = ctx.createBuffer(1, n, sr), ch = buf.getChannelData(0);
-    let pk = 1e-6; for (let i = 0; i < wav.length; i++) pk = Math.max(pk, Math.abs(wav[i]));
-    for (let i = 0; i < n; i++) { const s = i * Artoo.SR / sr, i0 = Math.floor(s), f = s - i0; const a = wav[Math.min(i0, wav.length - 1)], b = wav[Math.min(i0 + 1, wav.length - 1)]; ch[i] = (a + (b - a) * f) / pk * 0.8; }
-    const src = ctx.createBufferSource(); src.buffer = buf; src.connect(ctx.destination); src.onended = () => resolve(); src.start(); }); }
-  async function pressed(btn, label, fn) { const old = btn.textContent; btn.classList.add("busy"); btn.textContent = label; btn.disabled = true; try { await fn(); } finally { btn.classList.remove("busy"); btn.textContent = old; btn.disabled = false; } }
+  function audioCtx() { if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { actx = null; } } return actx; }
+  function playAsync(wav) { return new Promise((resolve) => {
+    if (!wav) return resolve(); const ctx = audioCtx(); if (!ctx) { $("status").textContent = "audio is not available in this viewer"; return resolve(); }
+    let done = false; const finish = () => { if (!done) { done = true; resolve(); } };
+    const go = () => { try {
+      const sr = ctx.sampleRate, n = Math.round(wav.length * sr / Artoo.SR), buf = ctx.createBuffer(1, n, sr), ch = buf.getChannelData(0);
+      let pk = 1e-6; for (let i = 0; i < wav.length; i++) pk = Math.max(pk, Math.abs(wav[i]));
+      for (let i = 0; i < n; i++) { const s = i * Artoo.SR / sr, i0 = Math.floor(s), f = s - i0; const a = wav[Math.min(i0, wav.length - 1)], b = wav[Math.min(i0 + 1, wav.length - 1)]; ch[i] = (a + (b - a) * f) / pk * 0.8; }
+      const src = ctx.createBufferSource(); src.buffer = buf; src.connect(ctx.destination); src.onended = finish; src.start();
+      setTimeout(finish, buf.duration * 1000 + 500); // safety: resolve even if 'ended' never fires (suspended or blocked audio)
+      if (ctx.state !== "running") $("status").textContent = "audio blocked by the browser \u2014 click any Play button once";
+    } catch (e) { finish(); } };
+    if (ctx.state === "suspended") { let resumed = false; ctx.resume().then(() => { resumed = true; go(); }).catch(() => finish()); setTimeout(() => { if (!resumed) { $("status").textContent = "audio blocked by the browser \u2014 click any Play button once"; finish(); } }, 800); }
+    else go(); }); }
+  async function pressed(btn, label, fn) { const old = btn.textContent; btn.classList.add("busy"); btn.textContent = label; btn.disabled = true; try { await fn(); } finally { btn.classList.remove("busy"); btn.disabled = false; btn.classList.add("done"); btn.textContent = "Done \u2713"; setTimeout(() => { btn.classList.remove("done"); btn.textContent = old; }, 600); } }
   function flash(btn) { btn.classList.add("flash"); setTimeout(() => btn.classList.remove("flash"), 350); }
   $("play").addEventListener("click", () => pressed($("play"), "Playing…", () => playAsync(state.wavTx)));
   $("playrx").addEventListener("click", () => pressed($("playrx"), "Playing…", () => playAsync(state.wavRx)));
