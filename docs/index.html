@@ -44,6 +44,12 @@
   button.chan { background: var(--chan); color: #fff; border-color: transparent; }
   button.b { background: var(--b); color: #fff; border-color: transparent; }
   button:disabled { opacity: 0.55; cursor: not-allowed; }
+  button:not(:disabled):hover { border-color: var(--accent); background: var(--accent-soft); }
+  button.primary:not(:disabled):hover { background: color-mix(in srgb, var(--accent) 85%, black); } button.chan:not(:disabled):hover { background: color-mix(in srgb, var(--chan) 85%, black); } button.b:not(:disabled):hover { background: color-mix(in srgb, var(--b) 85%, black); }
+  button:not(:disabled):active { transform: translateY(1px); filter: brightness(0.92); }
+  button.busy { background: var(--accent); color: var(--accent-ink); border-color: transparent; cursor: progress; opacity: 1; }
+  button.flash { background: var(--accent-soft); border-color: var(--accent); }
+  button { transition: background-color 120ms ease, border-color 120ms ease, transform 60ms ease; }
   canvas { width: 100%; max-width: 100%; display: block; border-radius: 6px; background: var(--panel2); }
   .canvasbox { position: relative; } .canvasbox .cap { position: absolute; left: 8px; top: 6px; font-family: var(--mono); font-size: 11px; color: var(--muted); background: color-mix(in srgb, var(--panel) 75%, transparent); padding: 1px 6px; border-radius: 4px; }
   .readout { font-family: var(--mono); font-size: 18px; line-height: 1.5; min-height: 2em; padding: 10px 12px; background: var(--panel2); border-radius: 6px; word-break: break-word; }
@@ -78,6 +84,19 @@
     </div>
     <div class="status" id="status">loading weights…</div>
   </header>
+
+  <section class="panel conv">
+    <h2>Conversation between two robots</h2>
+    <p class="note">Alpha speaks, the audio plays out loud, Bravo hears it through the channel settings above and replies out loud; then Alpha decodes the reply. Every bubble shows what was said and what the other robot actually heard.</p>
+    <div class="row">
+      <div><label for="convmsg">Alpha says</label><input type="text" id="convmsg" value="<STATUS> battery 42" spellcheck="false"></div>
+      <button class="b grow0" id="convsend">Say it</button>
+      <button class="grow0" id="convscript">Play a scripted exchange</button>
+      <button class="grow0" id="convclear">Clear</button>
+      <label class="inline grow0"><input type="checkbox" id="autoreply" checked> Bravo replies</label>
+    </div>
+    <div class="transcript" id="transcript"></div>
+  </section>
 
   <div class="grid">
     <section class="panel tx">
@@ -129,18 +148,6 @@
     </section>
   </div>
 
-  <section class="panel conv">
-    <h2>Conversation between two robots</h2>
-    <p class="note">Alpha speaks, the audio plays out loud, Bravo hears it through the channel settings above and replies out loud; then Alpha decodes the reply. Every bubble shows what was said and what the other robot actually heard.</p>
-    <div class="row">
-      <div><label for="convmsg">Alpha says</label><input type="text" id="convmsg" value="<STATUS> battery 42" spellcheck="false"></div>
-      <button class="b grow0" id="convsend">Say it</button>
-      <button class="grow0" id="convscript">Play a scripted exchange</button>
-      <button class="grow0" id="convclear">Clear</button>
-      <label class="inline grow0"><input type="checkbox" id="autoreply" checked> Bravo replies</label>
-    </div>
-    <div class="transcript" id="transcript"></div>
-  </section>
 
   <div class="grid">
     <section class="panel">
@@ -210,7 +217,7 @@
   $("model").addEventListener("change", async () => { state.model = MODELS.find((m) => m.id === $("model").value); state.W = await loadModel(state.model.id); $("status").textContent = "ready · " + state.model.label; });
   $("snr").addEventListener("input", () => { $("snrv").textContent = $("snr").value + " dB"; });
   $("clean").addEventListener("change", () => { $("snr").disabled = $("clean").checked; });
-  $("random").addEventListener("click", () => { $("msg").value = randomMessage(); transmit(true); });
+  $("random").addEventListener("click", () => { flash($("random")); $("msg").value = randomMessage(); transmit(true); });
   $("send").addEventListener("click", () => transmit(true));
   $("msg").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); transmit(true); } });
   ["noise", "snr", "clean", "reverb", "clip", "drift"].forEach((id) => $(id).addEventListener("change", () => { if (state.wavTx) receiveOnly(); }));
@@ -229,15 +236,15 @@
 
   // ---- main transmit / receive
   async function transmit(withSound) {
-    if (state.busy || !state.W) return; state.busy = true; $("send").disabled = true;
+    if (state.busy || !state.W) return; state.busy = true; const sendBtn = $("send"); sendBtn.disabled = true; sendBtn.classList.add("busy"); sendBtn.textContent = "Transmitting…";
     const ids = Artoo.encode($("msg").value.trim());
-    if (!ids.length) { state.busy = false; $("send").disabled = false; return; }
+    if (!ids.length) { state.busy = false; sendBtn.disabled = false; sendBtn.classList.remove("busy"); sendBtn.textContent = "Transmit & decode"; return; }
     try {
       const s = synthesize(ids); state.wavTx = s.wav; state.ids = ids; state.tEnc = s.ms; $("txinfo").textContent = s.info;
       drawSpec($("spec"), s.mel, s.T); drawWave($("wave"), s.wav); $("play").disabled = false; $("playrx").disabled = false; $("st-dur").textContent = (s.wav.length / Artoo.SR).toFixed(2) + " s";
       await yieldUI(); receiveOnly();
       const mode = $("autoplay").value; if (withSound && mode !== "none") await playAsync(mode === "rx" ? state.wavRx : state.wavTx);
-    } finally { state.busy = false; $("send").disabled = false; }
+    } finally { state.busy = false; sendBtn.disabled = false; sendBtn.classList.remove("busy"); sendBtn.textContent = "Transmit & decode"; }
   }
   function receiveOnly() {
     const t0 = performance.now(); const r = receive(state.wavTx, channelCond()); state.wavRx = r.rx; drawSpec($("specrx"), r.mel, r.T);
@@ -278,7 +285,10 @@
     let pk = 1e-6; for (let i = 0; i < wav.length; i++) pk = Math.max(pk, Math.abs(wav[i]));
     for (let i = 0; i < n; i++) { const s = i * Artoo.SR / sr, i0 = Math.floor(s), f = s - i0; const a = wav[Math.min(i0, wav.length - 1)], b = wav[Math.min(i0 + 1, wav.length - 1)]; ch[i] = (a + (b - a) * f) / pk * 0.8; }
     const src = ctx.createBufferSource(); src.buffer = buf; src.connect(ctx.destination); src.onended = () => resolve(); src.start(); }); }
-  $("play").addEventListener("click", () => playAsync(state.wavTx)); $("playrx").addEventListener("click", () => playAsync(state.wavRx));
+  async function pressed(btn, label, fn) { const old = btn.textContent; btn.classList.add("busy"); btn.textContent = label; btn.disabled = true; try { await fn(); } finally { btn.classList.remove("busy"); btn.textContent = old; btn.disabled = false; } }
+  function flash(btn) { btn.classList.add("flash"); setTimeout(() => btn.classList.remove("flash"), 350); }
+  $("play").addEventListener("click", () => pressed($("play"), "Playing…", () => playAsync(state.wavTx)));
+  $("playrx").addEventListener("click", () => pressed($("playrx"), "Playing…", () => playAsync(state.wavRx)));
 
   // ---- conversation (simulated channel)
   function replyFor(heard) { const t = heard.toLowerCase(); const num = (t.match(/\d+/) || [String(rint(100))])[0];
@@ -298,12 +308,13 @@
   function bubbleHeard(b, listener, ref, hyp) { const h = b.querySelector(".heard"); h.textContent = listener + " heard: "; h.appendChild(diffFragment(ref, hyp)); const d = Artoo.editDistance(ref, hyp); b.querySelector(".meta").textContent = d === 0 ? "heard perfectly" : `${d} token error${d > 1 ? "s" : ""} (CER ${(100 * Math.min(d, ref.length) / ref.length).toFixed(0)} %)`; b.classList.remove("pending"); return Artoo.decode(hyp); }
   async function say(who, text, listener) { const ids = Artoo.encode(text); if (!ids.length) return ""; const b = bubble(who, text); const s = synthesize(ids); await playAsync(s.wav); const r = receive(s.wav, channelCond()); return bubbleHeard(b, listener, ids, r.hyp); }
   let convBusy = false;
-  async function exchange(text) { if (convBusy || !state.W) return; convBusy = true; $("convsend").disabled = true; $("convscript").disabled = true;
+  async function exchange(text) { if (convBusy || !state.W) return; convBusy = true; const sb = $("convsend"); sb.disabled = true; sb.classList.add("busy"); sb.textContent = "Talking…"; $("convscript").disabled = true;
     try { const heard = await say("alpha", text, "Bravo"); if ($("autoreply").checked) { await new Promise((r) => setTimeout(r, 250)); await say("bravo", replyFor(heard), "Alpha"); } }
-    finally { convBusy = false; $("convsend").disabled = false; $("convscript").disabled = false; } }
+    finally { convBusy = false; sb.disabled = false; sb.classList.remove("busy"); sb.textContent = "Say it"; $("convscript").disabled = false; } }
   $("convsend").addEventListener("click", () => exchange($("convmsg").value.trim()));
   $("convmsg").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); exchange($("convmsg").value.trim()); } });
-  $("convscript").addEventListener("click", async () => { for (const line of SCRIPT) { if (convBusy) break; $("convmsg").value = line; await exchange(line); await new Promise((r) => setTimeout(r, 400)); } });
+  let scriptRunning = false;
+  $("convscript").addEventListener("click", async () => { const b = $("convscript"); if (convBusy || scriptRunning) return; scriptRunning = true; b.classList.add("busy"); b.textContent = "Playing exchange…"; try { for (const line of SCRIPT) { $("convmsg").value = line; await exchange(line); await new Promise((r) => setTimeout(r, 400)); } } finally { scriptRunning = false; b.classList.remove("busy"); b.textContent = "Play a scripted exchange"; } });
   $("convclear").addEventListener("click", () => { $("transcript").innerHTML = ""; });
 
   // ---- batch stress test
